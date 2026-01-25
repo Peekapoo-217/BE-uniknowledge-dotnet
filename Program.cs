@@ -5,8 +5,11 @@ using Microsoft.IdentityModel.Tokens;
 using UniKnowledge.Data;
 using UniKnowledge.Hubs;
 using UniKnowledge.Services;
+using UniKnowledge.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
+
+DotNetEnv.Env.Load();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -99,8 +102,23 @@ builder.Services.AddScoped<IVoteService, VoteService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 
-// thï¿½m Services UserProfile
+// thêm Services UserProfile
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
+
+// Configure EmailSettings (merge appsettings.json + environment variables)
+builder.Services.Configure<EmailSettings>(options =>
+{
+    builder.Configuration.GetSection("EmailSettings").Bind(options);
+    // Override with environment variables if present
+    var envEmail = Environment.GetEnvironmentVariable("EMAIL_SENDER_EMAIL");
+    var envPassword = Environment.GetEnvironmentVariable("EMAIL_SENDER_PASSWORD");
+    if (!string.IsNullOrEmpty(envEmail)) options.SenderEmail = envEmail;
+    if (!string.IsNullOrEmpty(envPassword)) options.SenderPassword = envPassword;
+});
+
+// Configure PasswordResetSettings from appsettings.json
+builder.Services.Configure<PasswordResetSettings>(
+    builder.Configuration.GetSection("PasswordResetSettings"));
 
 // thêm services password
 builder.Services.AddScoped<IEmailService, EmailService>();

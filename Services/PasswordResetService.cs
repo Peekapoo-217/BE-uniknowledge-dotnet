@@ -1,22 +1,32 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using UniKnowledge.Data;
 using UniKnowledge.Models;
+using UniKnowledge.Settings;
+
 namespace UniKnowledge.Services;
+
 public interface IPasswordResetService
 {
     Task<bool> RequestPasswordResetAsync(string email);
     Task<bool> VerifyOtpAsync(string email, string otpCode);
     Task<bool> ResetPasswordAsync(string email, string otpCode, string newPassword);
 }
+
 public class PasswordResetService : IPasswordResetService
 {
     private readonly AppDbContext _context;
     private readonly IEmailService _emailService;
+    private readonly PasswordResetSettings _settings;
 
-    public PasswordResetService(AppDbContext context, IEmailService emailService)
+    public PasswordResetService(
+        AppDbContext context, 
+        IEmailService emailService,
+        IOptions<PasswordResetSettings> settings)
     {
         _context = context;
         _emailService = emailService;
+        _settings = settings.Value;
     }
 
     public async Task<bool> RequestPasswordResetAsync(string email)
@@ -24,7 +34,10 @@ public class PasswordResetService : IPasswordResetService
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null) return false;
 
-        var otpPlain = new Random().Next(100000, 999999).ToString();
+        // Generate OTP based on configured length
+        var min = (int)Math.Pow(10, _settings.OtpLength - 1);
+        var max = (int)Math.Pow(10, _settings.OtpLength) - 1;
+        var otpPlain = new Random().Next(min, max).ToString();
         var otpHashed = BCrypt.Net.BCrypt.HashPassword(otpPlain);
 
         var oldTokens = await _context.PasswordResetTokens
@@ -37,7 +50,7 @@ public class PasswordResetService : IPasswordResetService
             UserId = user.UserId,
             Email = email,
             OtpCode = otpHashed,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_settings.OtpExpirationMinutes),
             IsUsed = false,
             CreatedAt = DateTime.UtcNow
         };

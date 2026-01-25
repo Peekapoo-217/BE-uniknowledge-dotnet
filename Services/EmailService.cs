@@ -1,5 +1,7 @@
 ﻿using MailKit.Net.Smtp;
+using Microsoft.Extensions.Options;
 using MimeKit;
+using UniKnowledge.Settings;
 
 namespace UniKnowledge.Services;
 
@@ -10,20 +12,19 @@ public interface IEmailService
 
 public class EmailService : IEmailService
 {
-    private const string GMAIL_ADDRESS = "nguyentuankhanhqnu09870@gmail.com";
-    private const string GMAIL_APP_PASSWORD = "hmzpywljjahyzdvs";
+    private readonly EmailSettings _settings;
+
+    public EmailService(IOptions<EmailSettings> settings)
+    {
+        _settings = settings.Value;
+    }
 
     public async Task SendOtpEmailAsync(string toEmail, string otpCode)
     {
-        Console.WriteLine("═══════════════════════════════════════");
-        Console.WriteLine($"📧 Attempting to send OTP to: {toEmail}");
-        Console.WriteLine($"🔐 OTP Code: {otpCode}");
-
         try
         {
-            Console.WriteLine("🔵 Creating email message...");
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress("UniKnowledge", GMAIL_ADDRESS));
+            message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
             message.To.Add(new MailboxAddress("", toEmail));
             message.Subject = "Password Reset - OTP Code";
 
@@ -43,29 +44,15 @@ public class EmailService : IEmailService
                 "
             };
 
-            Console.WriteLine("🔵 Connecting to Gmail SMTP server...");
             using var client = new SmtpClient();
-            await client.ConnectAsync("smtp.gmail.com", 587, false);
-
-            Console.WriteLine("🔵 Authenticating with Gmail...");
-            await client.AuthenticateAsync(GMAIL_ADDRESS, GMAIL_APP_PASSWORD);
-
-            Console.WriteLine("🔵 Sending email...");
+            await client.ConnectAsync(_settings.SmtpServer, _settings.SmtpPort, false);
+            await client.AuthenticateAsync(_settings.SenderEmail, _settings.SenderPassword);
             await client.SendAsync(message);
-
-            Console.WriteLine("🔵 Disconnecting...");
             await client.DisconnectAsync(true);
-
-            Console.WriteLine("✅ Email sent successfully!");
-            Console.WriteLine("═══════════════════════════════════════");
         }
         catch (Exception ex)
         {
-            Console.WriteLine("❌ FAILED TO SEND EMAIL!");
-            Console.WriteLine($"❌ Error Type: {ex.GetType().Name}");
-            Console.WriteLine($"❌ Error Message: {ex.Message}");
-            Console.WriteLine($"❌ Stack Trace: {ex.StackTrace}");
-            Console.WriteLine("═══════════════════════════════════════");
+            Console.WriteLine($"Failed to send OTP email: {ex.Message}");
             throw;
         }
     }

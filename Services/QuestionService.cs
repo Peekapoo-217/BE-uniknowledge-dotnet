@@ -179,6 +179,8 @@ public class QuestionService : IQuestionService
             var question = await _context.Questions
                 .Include(q => q.QuestionTags)
                 .Include(q => q.Votes)
+                .Include(q => q.Answers)
+                    .ThenInclude(a => a.Votes)
                 .FirstOrDefaultAsync(q => q.QuestionId == id);
 
             if (question == null || question.UserId != userId)
@@ -196,6 +198,20 @@ public class QuestionService : IQuestionService
                 {
                     // Continue with question deletion even if file deletion fails
                 }
+            }
+
+            // Delete answer votes first
+            if (question.Answers != null && question.Answers.Any())
+            {
+                foreach (var answer in question.Answers)
+                {
+                    if (answer.Votes != null && answer.Votes.Any())
+                    {
+                        _context.Votes.RemoveRange(answer.Votes);
+                    }
+                }
+                // Then delete answers
+                _context.Answers.RemoveRange(question.Answers);
             }
 
             if (question.QuestionTags != null && question.QuestionTags.Any())
