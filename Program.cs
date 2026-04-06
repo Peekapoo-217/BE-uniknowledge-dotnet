@@ -1,7 +1,7 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using UniKnowledge.Data;
 using UniKnowledge.Hubs;
 using UniKnowledge.Services;
@@ -101,8 +101,10 @@ builder.Services.AddScoped<IAnswerService, AnswerService>();
 builder.Services.AddScoped<IVoteService, VoteService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ITagService, TagService>();
 
-// thêm Services UserProfile
+// thÃªm Services UserProfile
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 
 // Configure EmailSettings (merge appsettings.json + environment variables)
@@ -120,7 +122,7 @@ builder.Services.Configure<EmailSettings>(options =>
 builder.Services.Configure<PasswordResetSettings>(
     builder.Configuration.GetSection("PasswordResetSettings"));
 
-// thêm services password
+// thÃªm services password
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 

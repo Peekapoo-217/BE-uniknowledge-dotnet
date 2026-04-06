@@ -1,7 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using UniKnowledge.Data;
 using UniKnowledge.DTOs.User;
 using UniKnowledge.DTOs.Question;
+using UniKnowledge.DTOs.Shared;
+using UniKnowledge.Helpers;
 using UniKnowledge.Models;
 
 namespace UniKnowledge.Services;
@@ -9,7 +11,7 @@ namespace UniKnowledge.Services;
 public interface IUserProfileService
 {
     Task<UserProfileDto?> GetUserProfileAsync(int userId);
-    Task<List<QuestionResponseDto>> GetUserQuestionsAsync(int userId);
+    Task<CursorPagedResult<QuestionResponseDto>> GetUserQuestionsAsync(int userId, int limit = 20, string? after = null);
     Task<UserProfileDto?> UpdateProfileAsync(int userId, UpdateProfileDto dto);
     Task<bool> ChangePasswordAsync(int userId, ChangePasswordDto dto);
     Task<UserProfileDto?> UploadAvatarAsync(int userId, IFormFile file);
@@ -51,20 +53,36 @@ public class UserProfileService : IUserProfileService
         };
     }
 
-    public async Task<List<QuestionResponseDto>> GetUserQuestionsAsync(int userId)
+    public async Task<CursorPagedResult<QuestionResponseDto>> GetUserQuestionsAsync(int userId, int limit = 20, string? after = null)
     {
-        var questions = await _context.Questions
+        var query = _context.Questions
             .Include(q => q.User)
             .Include(q => q.Category)
             .Include(q => q.QuestionTags)
                 .ThenInclude(qt => qt.Tag)
             .Include(q => q.Answers)
             .Include(q => q.Votes)
-            .Where(q => q.UserId == userId)
+            .Where(q => q.UserId == userId);
+
+        // Apply cursor
+        var cursor = CursorHelper.Decode(after);
+        if (cursor.HasValue)
+        {
+            var (cursorDate, cursorId) = cursor.Value;
+            query = query.Where(q => q.CreatedAt < cursorDate ||
+                        (q.CreatedAt == cursorDate && q.QuestionId < cursorId));
+        }
+
+        var questions = await query
             .OrderByDescending(q => q.CreatedAt)
+            .ThenByDescending(q => q.QuestionId)
+            .Take(limit + 1)
             .ToListAsync();
 
-        return questions.Select(q => new QuestionResponseDto
+        var hasNextPage = questions.Count > limit;
+        var items = questions.Take(limit).ToList();
+
+        var dtos = items.Select(q => new QuestionResponseDto
         {
             QuestionId = q.QuestionId,
             Title = q.Title,
@@ -89,6 +107,16 @@ public class UserProfileService : IUserProfileService
             VoteCount = q.Votes.Sum(v => v.VoteType),
             HasAcceptedAnswer = q.Answers.Any(a => a.IsAccepted)
         }).ToList();
+
+        return new CursorPagedResult<QuestionResponseDto>
+        {
+            Items = dtos,
+            PageInfo = new PageInfo
+            {
+                HasNextPage = hasNextPage,
+                EndCursor = items.Any() ? CursorHelper.Encode(items.Last().CreatedAt, items.Last().QuestionId) : null
+            }
+        };
     }
 
     public async Task<UserProfileDto?> UpdateProfileAsync(int userId, UpdateProfileDto dto)

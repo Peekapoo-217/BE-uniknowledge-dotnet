@@ -18,9 +18,9 @@ public class AnswersController : ControllerBase
     }
 
     [HttpGet("questions/{questionId}/answers")]
-    public async Task<ActionResult<List<AnswerResponseDto>>> GetAnswers(int questionId)
+    public async Task<ActionResult> GetAnswers(int questionId, [FromQuery] int limit = 20, [FromQuery] string? after = null)
     {
-        var answers = await _answerService.GetAnswersByQuestionIdAsync(questionId);
+        var answers = await _answerService.GetAnswersByQuestionIdAsync(questionId, limit, after);
         return Ok(answers);
     }
 

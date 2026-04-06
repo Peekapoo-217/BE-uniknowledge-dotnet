@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UniKnowledge.DTOs.User;
@@ -34,10 +34,10 @@ public class UserProfileController : ControllerBase
     }
 
     [HttpGet("me/questions")]
-    public async Task<ActionResult<List<QuestionResponseDto>>> GetMyQuestions()
+    public async Task<ActionResult> GetMyQuestions([FromQuery] int limit = 20, [FromQuery] string? after = null)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var questions = await _userProfileService.GetUserQuestionsAsync(userId);
+        var questions = await _userProfileService.GetUserQuestionsAsync(userId, limit, after);
         return Ok(questions);
     }
 
@@ -101,9 +101,9 @@ public class UserProfileController : ControllerBase
 
     [HttpGet("{id}/questions")]
     [AllowAnonymous]
-    public async Task<ActionResult<List<QuestionResponseDto>>> GetUserQuestions(int id)
+    public async Task<ActionResult> GetUserQuestions(int id, [FromQuery] int limit = 20, [FromQuery] string? after = null)
     {
-        var questions = await _userProfileService.GetUserQuestionsAsync(id);
+        var questions = await _userProfileService.GetUserQuestionsAsync(id, limit, after);
         return Ok(questions);
     }
 

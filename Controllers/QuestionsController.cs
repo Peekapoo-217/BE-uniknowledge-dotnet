@@ -23,15 +23,15 @@ public class QuestionsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<QuestionResponseDto>>> GetQuestions(
+    public async Task<ActionResult> GetQuestions(
         [FromQuery] string? search,
         [FromQuery] int? categoryId,
         [FromQuery] int? tagId,
         [FromQuery] string? status,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int limit = 20,
+        [FromQuery] string? after = null)
     {
-        var questions = await _questionService.GetQuestionsAsync(search, categoryId, tagId, status, page, pageSize);
+        var questions = await _questionService.GetQuestionsAsync(search, categoryId, tagId, status, limit, after);
         return Ok(questions);
     }
 

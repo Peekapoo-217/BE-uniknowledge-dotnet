@@ -1,13 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using UniKnowledge.Data;
 using UniKnowledge.DTOs.Answer;
+using UniKnowledge.DTOs.Shared;
+using UniKnowledge.Helpers;
 using UniKnowledge.Models;
 
 namespace UniKnowledge.Services;
 
 public interface IAnswerService
 {
-    Task<List<AnswerResponseDto>> GetAnswersByQuestionIdAsync(int questionId);
+    Task<CursorPagedResult<AnswerResponseDto>> GetAnswersByQuestionIdAsync(int questionId, int limit = 20, string? after = null);
     Task<AnswerResponseDto> CreateAnswerAsync(int questionId, CreateAnswerDto dto, int userId);
     Task<AnswerResponseDto?> UpdateAnswerAsync(int id, UpdateAnswerDto dto, int userId);
     Task<bool> DeleteAnswerAsync(int id, int userId);
@@ -23,17 +25,42 @@ public class AnswerService : IAnswerService
         _context = context;
     }
 
-    public async Task<List<AnswerResponseDto>> GetAnswersByQuestionIdAsync(int questionId)
+    public async Task<CursorPagedResult<AnswerResponseDto>> GetAnswersByQuestionIdAsync(int questionId, int limit = 20, string? after = null)
     {
-        var answers = await _context.Answers
+        var query = _context.Answers
             .Include(a => a.User)
             .Include(a => a.Votes)
-            .Where(a => a.QuestionId == questionId)
-            .OrderByDescending(a => a.IsAccepted)
-            .ThenByDescending(a => a.CreatedAt)
-            .ToListAsync();
+            .Where(a => a.QuestionId == questionId);
 
-        return answers.Select(a => MapToDto(a)).ToList();
+        // Apply cursor filter
+        var cursor = CursorHelper.Decode(after);
+        if (cursor.HasValue)
+        {
+            var (cursorDate, cursorId) = cursor.Value;
+            query = query.Where(a => a.CreatedAt < cursorDate ||
+                        (a.CreatedAt == cursorDate && a.AnswerId < cursorId));
+        }
+
+        // Accepted answers first, then newest
+        query = query.OrderByDescending(a => a.IsAccepted)
+                     .ThenByDescending(a => a.CreatedAt)
+                     .ThenByDescending(a => a.AnswerId);
+
+        var answers = await query.Take(limit + 1).ToListAsync();
+        var hasNextPage = answers.Count > limit;
+        var items = answers.Take(limit).ToList();
+
+        var dtos = items.Select(a => MapToDto(a)).ToList();
+
+        return new CursorPagedResult<AnswerResponseDto>
+        {
+            Items = dtos,
+            PageInfo = new PageInfo
+            {
+                HasNextPage = hasNextPage,
+                EndCursor = items.Any() ? CursorHelper.Encode(items.Last().CreatedAt, items.Last().AnswerId) : null
+            }
+        };
     }
 
     public async Task<AnswerResponseDto> CreateAnswerAsync(int questionId, CreateAnswerDto dto, int userId)

@@ -1,13 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using UniKnowledge.Data;
 using UniKnowledge.DTOs.Question;
+using UniKnowledge.DTOs.Shared;
+using UniKnowledge.Helpers;
 using UniKnowledge.Models;
 
 namespace UniKnowledge.Services;
 
 public interface IQuestionService
 {
-    Task<List<QuestionResponseDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int page = 1, int pageSize = 20);
+    Task<CursorPagedResult<QuestionResponseDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null);
     Task<QuestionResponseDto?> GetQuestionByIdAsync(int id);
     Task<QuestionResponseDto> CreateQuestionAsync(CreateQuestionDto dto, int userId);
     Task<QuestionResponseDto?> UpdateQuestionAsync(int id, UpdateQuestionDto dto, int userId);
@@ -26,7 +28,7 @@ public class QuestionService : IQuestionService
         _fileUploadService = fileUploadService;
     }
 
-    public async Task<List<QuestionResponseDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int page = 1, int pageSize = 20)
+    public async Task<CursorPagedResult<QuestionResponseDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null)
     {
         var query = _context.Questions
             .Include(q => q.User)
@@ -59,20 +61,38 @@ public class QuestionService : IQuestionService
         }
         else
         {
-            // By default, only show Open questions
             query = query.Where(q => q.Status != "Hidden");
         }
 
-        // Order by created date (newest first)
-        query = query.OrderByDescending(q => q.CreatedAt);
+        // Apply cursor filter
+        var cursor = CursorHelper.Decode(after);
+        if (cursor.HasValue)
+        {
+            var (cursorDate, cursorId) = cursor.Value;
+            query = query.Where(q => q.CreatedAt < cursorDate ||
+                        (q.CreatedAt == cursorDate && q.QuestionId < cursorId));
+        }
 
-        // Pagination
-        var questions = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+        // Order by created date (newest first), then by Id for stable sort
+        query = query.OrderByDescending(q => q.CreatedAt)
+                     .ThenByDescending(q => q.QuestionId);
 
-        return questions.Select(q => MapToDto(q)).ToList();
+        // Fetch limit + 1 to determine hasNextPage
+        var questions = await query.Take(limit + 1).ToListAsync();
+        var hasNextPage = questions.Count > limit;
+        var items = questions.Take(limit).ToList();
+
+        var dtos = items.Select(q => MapToDto(q)).ToList();
+
+        return new CursorPagedResult<QuestionResponseDto>
+        {
+            Items = dtos,
+            PageInfo = new PageInfo
+            {
+                HasNextPage = hasNextPage,
+                EndCursor = items.Any() ? CursorHelper.Encode(items.Last().CreatedAt, items.Last().QuestionId) : null
+            }
+        };
     }
 
     public async Task<QuestionResponseDto?> GetQuestionByIdAsync(int id)

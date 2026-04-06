@@ -19,21 +19,21 @@ public class MessagesController : ControllerBase
     }
 
     [HttpGet("conversations")]
-    public async Task<ActionResult<List<ConversationDto>>> GetConversations()
+    public async Task<ActionResult> GetConversations([FromQuery] int limit = 20, [FromQuery] string? after = null)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var conversations = await _messageService.GetConversationsAsync(userId);
+        var conversations = await _messageService.GetConversationsAsync(userId, limit, after);
         return Ok(conversations);
     }
 
     [HttpGet("conversation/{otherUserId}")]
-    public async Task<ActionResult<List<MessageResponseDto>>> GetConversation(
+    public async Task<ActionResult> GetConversation(
         int otherUserId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50)
+        [FromQuery] int limit = 50,
+        [FromQuery] string? after = null)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var messages = await _messageService.GetConversationAsync(userId, otherUserId, page, pageSize);
+        var messages = await _messageService.GetConversationAsync(userId, otherUserId, limit, after);
         return Ok(messages);
     }
 

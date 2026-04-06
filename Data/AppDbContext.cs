@@ -75,6 +75,16 @@ public class AppDbContext : DbContext
                 .WithMany(c => c.Questions)
                 .HasForeignKey(e => e.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Composite indexes for cursor-based pagination
+            entity.HasIndex(e => new { e.CreatedAt, e.QuestionId })
+                .IsDescending(true, true)
+                .HasDatabaseName("IX_Questions_CreatedAt_Id");
+
+            // Index for user's questions (profile page)
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt, e.QuestionId })
+                .IsDescending(false, true, true)
+                .HasDatabaseName("IX_Questions_UserId_CreatedAt_Id");
         });
 
         // Answer configuration
@@ -92,6 +102,11 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.Answers)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Composite index for cursor-based pagination (answers by question)
+            entity.HasIndex(e => new { e.QuestionId, e.IsAccepted, e.CreatedAt, e.AnswerId })
+                .IsDescending(false, true, true, true)
+                .HasDatabaseName("IX_Answers_QuestionId_Cursor");
         });
 
         // Vote configuration
@@ -151,6 +166,16 @@ public class AppDbContext : DbContext
                 .WithMany(u => u.ReceivedMessages)
                 .HasForeignKey(e => e.ReceiverId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Composite indexes for cursor-based pagination
+            // Conversation query: messages between two users, sorted by time
+            entity.HasIndex(e => new { e.SenderId, e.ReceiverId, e.CreatedAt, e.MessageId })
+                .IsDescending(false, false, true, true)
+                .HasDatabaseName("IX_Messages_Sender_Receiver_CreatedAt");
+
+            // Unread messages lookup
+            entity.HasIndex(e => new { e.ReceiverId, e.IsRead, e.SenderId })
+                .HasDatabaseName("IX_Messages_Unread_Lookup");
         });
         // PasswordResetToken configuration
         modelBuilder.Entity<PasswordResetToken>(entity =>
