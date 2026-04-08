@@ -109,11 +109,13 @@ BE/UniKnowledge/
 | `UserId` | int | FK → User (Cascade) | Người đặt câu hỏi |
 | `CategoryId` | int | FK → Category (Restrict) | Danh mục |
 | `Title` | string | Required, Max 255 | Tiêu đề |
-| `Content` | string | Required | Nội dung |
+| `Content` | string? | Optional | Nội dung (Có thể để trống) |
 | `ViewCount` | int | Default: 0 | Lượt xem |
 | `Status` | string | Required, Max 20, Default: "Open" | Trạng thái: Open / Closed / Hidden |
 | `ImageUrl` | string? | Max 255 | URL ảnh đính kèm |
 | `FileUrl` | string? | Max 255 | URL file đính kèm |
+| `CodeContent` | string? | Max (MAX) | Nội dung code snippet |
+| `CodeLanguage` | string? | Max 50 | Ngôn ngữ của snippet |
 | `CreatedAt` | DateTime | Default: UtcNow | Ngày tạo |
 | `UpdatedAt` | DateTime? | | Ngày cập nhật |
 
@@ -126,9 +128,29 @@ BE/UniKnowledge/
 | `QuestionId` | int | FK → Question (Cascade) | Câu hỏi |
 | `UserId` | int | FK → User (Restrict) | Người trả lời |
 | `Content` | string | Required | Nội dung |
+| `CodeContent` | string? | Max (MAX) | Nội dung code snippet |
+| `CodeLanguage` | string? | Max 50 | Ngôn ngữ của snippet |
 | `IsAccepted` | bool | Default: false | Đã được chấp nhận |
+| `ParentId` | int? | FK → Answer (Restrict) | Trả lời cho câu hỏi nào (Hierarchy) |
 | `CreatedAt` | DateTime | Default: UtcNow | Ngày tạo |
 | `UpdatedAt` | DateTime? | | Ngày cập nhật |
+
+### Performance Optimization: Summary vs Detail
+Hệ thống sử dụng cơ chế **Summary/Detail split** để tối ưu hóa hiệu năng truyền tải dữ liệu, đặc biệt với các câu hỏi chứa code snippet lớn.
+
+#### QuestionSummaryDto
+Sử dụng cho các API danh sách (List View).
+- Loại bỏ trường `CodeContent`.
+- `Content`: Chỉ chứa 200 ký tự đầu.
+- `CodeLineCount`: Số dòng code (để FE quyết định hiển thị).
+
+#### API Endpoints mới:
+- `GET /api/questions/{id}/code`: Trả về nội dung chuỗi Code đầy đủ của câu hỏi.
+- `GET /api/answers/{id}/code`: Trả về nội dung chuỗi Code đầy đủ của câu trả lời.
+
+#### Lazy Loading Logic:
+- Nếu `CodeLineCount < 20`: Code được trả về ngay trong Detail DTO.
+- Nếu `CodeLineCount >= 20`: `CodeContent` sẽ là null, Frontend hiển thị nút "Show Code" và gọi API `/code` khi cần.
 
 **Navigation:** Question, User, Votes
 
@@ -251,6 +273,7 @@ BE/UniKnowledge/
 
 **Sắp xếp:** Accepted trước → Mới nhất  
 **Accept logic:** Bỏ chấp nhận các câu trả lời khác → Chấp nhận câu được chọn
+**Nesting:** Hỗ trợ phân cấp 1 mức qua `ParentId`. FE hiển thị thụt lề cho các phản hồi.
 
 ---
 

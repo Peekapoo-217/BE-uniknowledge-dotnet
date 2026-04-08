@@ -24,6 +24,14 @@ public class AnswersController : ControllerBase
         return Ok(answers);
     }
 
+    [HttpGet("answers/{id}/code")]
+    public async Task<ActionResult<string>> GetAnswerCode(int id)
+    {
+        var code = await _answerService.GetAnswerCodeAsync(id);
+        if (code == null) return NotFound();
+        return Ok(code);
+    }
+
     [Authorize]
     [HttpPost("questions/{questionId}/answers")]
     public async Task<ActionResult<AnswerResponseDto>> CreateAnswer(int questionId, [FromBody] CreateAnswerDto dto)

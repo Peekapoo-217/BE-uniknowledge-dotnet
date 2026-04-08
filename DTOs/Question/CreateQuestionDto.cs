@@ -8,9 +8,7 @@ public class CreateQuestionDto
     [StringLength(255, MinimumLength = 10)]
     public string Title { get; set; } = string.Empty;
 
-    [Required]
-    [MinLength(20)]
-    public string Content { get; set; } = string.Empty;
+    public string? Content { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Category is required")]
     public int CategoryId { get; set; }
@@ -20,5 +18,8 @@ public class CreateQuestionDto
     public string? ImageUrl { get; set; }
     
     public string? FileUrl { get; set; }
-}
 
+    public string? CodeContent { get; set; }
+
+    public string? CodeLanguage { get; set; }
+}
