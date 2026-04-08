@@ -51,6 +51,14 @@ public class QuestionsController : ControllerBase
         return Ok(question);
     }
 
+    [HttpGet("{id}/code")]
+    public async Task<ActionResult<string>> GetQuestionCode(int id)
+    {
+        var code = await _questionService.GetQuestionCodeAsync(id);
+        if (code == null) return NotFound();
+        return Ok(code);
+    }
+
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<QuestionResponseDto>> CreateQuestion([FromBody] CreateQuestionDto dto)

@@ -103,6 +103,12 @@ public class AppDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Self-referencing relationship for nested replies
+            entity.HasOne(e => e.Parent)
+                .WithMany(a => a.Replies)
+                .HasForeignKey(e => e.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Composite index for cursor-based pagination (answers by question)
             entity.HasIndex(e => new { e.QuestionId, e.IsAccepted, e.CreatedAt, e.AnswerId })
                 .IsDescending(false, true, true, true)

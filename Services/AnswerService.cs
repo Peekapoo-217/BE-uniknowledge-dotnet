@@ -11,6 +11,7 @@ public interface IAnswerService
 {
     Task<CursorPagedResult<AnswerResponseDto>> GetAnswersByQuestionIdAsync(int questionId, int limit = 20, string? after = null);
     Task<AnswerResponseDto> CreateAnswerAsync(int questionId, CreateAnswerDto dto, int userId);
+    Task<string?> GetAnswerCodeAsync(int id);
     Task<AnswerResponseDto?> UpdateAnswerAsync(int id, UpdateAnswerDto dto, int userId);
     Task<bool> DeleteAnswerAsync(int id, int userId);
     Task<bool> AcceptAnswerAsync(int id, int userId);
@@ -63,13 +64,26 @@ public class AnswerService : IAnswerService
         };
     }
 
+    public async Task<string?> GetAnswerCodeAsync(int id)
+    {
+        return await _context.Answers
+            .Where(a => a.AnswerId == id)
+            .Select(a => a.CodeContent)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<AnswerResponseDto> CreateAnswerAsync(int questionId, CreateAnswerDto dto, int userId)
     {
+        var lineCount = string.IsNullOrEmpty(dto.CodeContent) ? 0 : dto.CodeContent.Split('\n').Length;
         var answer = new Answer
         {
             QuestionId = questionId,
             UserId = userId,
             Content = dto.Content,
+            CodeContent = dto.CodeContent,
+            CodeLanguage = dto.CodeLanguage,
+            CodeLineCount = lineCount,
+            ParentId = dto.ParentId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -95,6 +109,13 @@ public class AnswerService : IAnswerService
         }
 
         answer.Content = dto.Content;
+        if (dto.CodeContent != null)
+        {
+            answer.CodeContent = dto.CodeContent;
+            answer.CodeLineCount = dto.CodeContent.Split('\n').Length;
+        }
+        if (dto.CodeLanguage != null)
+            answer.CodeLanguage = dto.CodeLanguage;
         answer.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
@@ -143,14 +164,19 @@ public class AnswerService : IAnswerService
 
     private AnswerResponseDto MapToDto(Answer a)
     {
+        var shouldIncludeCode = a.CodeLineCount < 20;
         return new AnswerResponseDto
         {
             AnswerId = a.AnswerId,
             QuestionId = a.QuestionId,
             Content = a.Content,
+            CodeContent = shouldIncludeCode ? a.CodeContent : null,
+            CodeLanguage = a.CodeLanguage,
+            CodeLineCount = a.CodeLineCount,
             IsAccepted = a.IsAccepted,
             CreatedAt = a.CreatedAt,
             UpdatedAt = a.UpdatedAt,
+            ParentId = a.ParentId,
             UserId = a.UserId,
             Username = a.User.Username,
             AvatarUrl = a.User.AvatarUrl,
@@ -158,4 +184,3 @@ public class AnswerService : IAnswerService
         };
     }
 }
-

@@ -4,11 +4,14 @@ public class QuestionResponseDto
 {
     public int QuestionId { get; set; }
     public string Title { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
+    public string? Content { get; set; } = string.Empty;
     public int ViewCount { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public string? FileUrl { get; set; }
+    public string? CodeContent { get; set; }
+    public string? CodeLanguage { get; set; }
+    public int CodeLineCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

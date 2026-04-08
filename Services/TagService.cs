@@ -1,12 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using UniKnowledge.Data;
+using UniKnowledge.DTOs.Question;
 using UniKnowledge.DTOs.Shared;
 using UniKnowledge.DTOs.Tag;
-using UniKnowledge.DTOs.Question;
 using UniKnowledge.Helpers;
 using UniKnowledge.Models;
 
@@ -230,7 +226,7 @@ public class TagService : ITagService
     public async Task<List<TagResponseDto>> GetTrendingTagsAsync(int days, int limit)
     {
         var cutoffDate = DateTime.UtcNow.AddDays(-days);
-        
+
         var tags = await _context.Tags
             .Include(t => t.QuestionTags)
                 .ThenInclude(qt => qt.Question)
@@ -275,7 +271,7 @@ public class TagService : ITagService
             }
             else
             {
-                query = query.Where(q => dto.TagIds.All(tagId => 
+                query = query.Where(q => dto.TagIds.All(tagId =>
                     q.QuestionTags.Any(qt => qt.TagId == tagId)));
             }
         }

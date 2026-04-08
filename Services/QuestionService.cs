@@ -9,8 +9,9 @@ namespace UniKnowledge.Services;
 
 public interface IQuestionService
 {
-    Task<CursorPagedResult<QuestionResponseDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null);
+    Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null);
     Task<QuestionResponseDto?> GetQuestionByIdAsync(int id);
+    Task<string?> GetQuestionCodeAsync(int id);
     Task<QuestionResponseDto> CreateQuestionAsync(CreateQuestionDto dto, int userId);
     Task<QuestionResponseDto?> UpdateQuestionAsync(int id, UpdateQuestionDto dto, int userId);
     Task<bool> DeleteQuestionAsync(int id, int userId);
@@ -28,7 +29,7 @@ public class QuestionService : IQuestionService
         _fileUploadService = fileUploadService;
     }
 
-    public async Task<CursorPagedResult<QuestionResponseDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null)
+    public async Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null)
     {
         var query = _context.Questions
             .Include(q => q.User)
@@ -42,7 +43,7 @@ public class QuestionService : IQuestionService
         // Apply filters
         if (!string.IsNullOrEmpty(search))
         {
-            query = query.Where(q => q.Title.Contains(search) || q.Content.Contains(search));
+            query = query.Where(q => q.Title.Contains(search) || (q.Content != null && q.Content.Contains(search)));
         }
 
         if (categoryId.HasValue)
@@ -82,9 +83,9 @@ public class QuestionService : IQuestionService
         var hasNextPage = questions.Count > limit;
         var items = questions.Take(limit).ToList();
 
-        var dtos = items.Select(q => MapToDto(q)).ToList();
+        var dtos = items.Select(q => MapToSummaryDto(q)).ToList();
 
-        return new CursorPagedResult<QuestionResponseDto>
+        return new CursorPagedResult<QuestionSummaryDto>
         {
             Items = dtos,
             PageInfo = new PageInfo
@@ -109,8 +110,17 @@ public class QuestionService : IQuestionService
         return question == null ? null : MapToDto(question);
     }
 
+    public async Task<string?> GetQuestionCodeAsync(int id)
+    {
+        return await _context.Questions
+            .Where(q => q.QuestionId == id)
+            .Select(q => q.CodeContent)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<QuestionResponseDto> CreateQuestionAsync(CreateQuestionDto dto, int userId)
     {
+        var lineCount = string.IsNullOrEmpty(dto.CodeContent) ? 0 : dto.CodeContent.Split('\n').Length;
         var question = new Question
         {
             UserId = userId,
@@ -119,6 +129,9 @@ public class QuestionService : IQuestionService
             CategoryId = dto.CategoryId,
             ImageUrl = dto.ImageUrl,
             FileUrl = dto.FileUrl,
+            CodeContent = dto.CodeContent,
+            CodeLanguage = dto.CodeLanguage,
+            CodeLineCount = lineCount,
             Status = "Open",
             CreatedAt = DateTime.UtcNow
         };
@@ -167,6 +180,15 @@ public class QuestionService : IQuestionService
 
         if (dto.FileUrl != null)
             question.FileUrl = dto.FileUrl;
+
+        if (dto.CodeContent != null)
+        {
+            question.CodeContent = dto.CodeContent;
+            question.CodeLineCount = dto.CodeContent.Split('\n').Length;
+        }
+
+        if (dto.CodeLanguage != null)
+            question.CodeLanguage = dto.CodeLanguage;
 
         if (!string.IsNullOrEmpty(dto.Status))
             question.Status = dto.Status;
@@ -268,8 +290,40 @@ public class QuestionService : IQuestionService
         return true;
     }
 
+    private QuestionSummaryDto MapToSummaryDto(Question q)
+    {
+        return new QuestionSummaryDto
+        {
+            QuestionId = q.QuestionId,
+            Title = q.Title,
+            Content = q.Content != null ? (q.Content.Length > 200 ? q.Content.Substring(0, 200) + "..." : q.Content) : string.Empty,
+            ViewCount = q.ViewCount,
+            Status = q.Status,
+            ImageUrl = q.ImageUrl,
+            FileUrl = q.FileUrl,
+            CodeLanguage = q.CodeLanguage,
+            CodeLineCount = q.CodeLineCount,
+            CreatedAt = q.CreatedAt,
+            UpdatedAt = q.UpdatedAt,
+            User = new UserSummaryDto { Username = q.User.Username, AvatarUrl = q.User.AvatarUrl },
+            Category = q.Category != null ? new CategorySummaryDto { CategoryId = q.Category.CategoryId, CategoryName = q.Category.CategoryName } : null,
+            Tags = q.QuestionTags.Select(qt => new TagSummaryDto
+            {
+                TagId = qt.TagId,
+                TagName = qt.Tag.TagName
+            }).ToList(),
+            AnswerCount = q.Answers.Count,
+            VoteCount = q.Votes.Sum(v => v.VoteType),
+            HasAcceptedAnswer = q.Answers.Any(a => a.IsAccepted)
+        };
+    }
+
     private QuestionResponseDto MapToDto(Question q)
     {
+        // Optimization: Only return full code if it's "short" (< 20 lines)
+        // Otherwise, FE will fetch it via the /code endpoint
+        var shouldIncludeCode = q.CodeLineCount < 20;
+
         return new QuestionResponseDto
         {
             QuestionId = q.QuestionId,
@@ -279,6 +333,9 @@ public class QuestionService : IQuestionService
             Status = q.Status,
             ImageUrl = q.ImageUrl,
             FileUrl = q.FileUrl,
+            CodeContent = shouldIncludeCode ? q.CodeContent : null,
+            CodeLanguage = q.CodeLanguage,
+            CodeLineCount = q.CodeLineCount,
             CreatedAt = q.CreatedAt,
             UpdatedAt = q.UpdatedAt,
             UserId = q.UserId,
@@ -297,4 +354,3 @@ public class QuestionService : IQuestionService
         };
     }
 }
-

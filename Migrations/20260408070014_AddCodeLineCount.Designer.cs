@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using UniKnowledge.Data;
 
@@ -11,9 +12,11 @@ using UniKnowledge.Data;
 namespace UniKnowledge.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260408070014_AddCodeLineCount")]
+    partial class AddCodeLineCount
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -49,9 +52,6 @@ namespace UniKnowledge.Migrations
                     b.Property<bool>("IsAccepted")
                         .HasColumnType("bit");
 
-                    b.Property<int?>("ParentId")
-                        .HasColumnType("int");
-
                     b.Property<int>("QuestionId")
                         .HasColumnType("int");
 
@@ -62,8 +62,6 @@ namespace UniKnowledge.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("AnswerId");
-
-                    b.HasIndex("ParentId");
 
                     b.HasIndex("UserId");
 
@@ -389,11 +387,6 @@ namespace UniKnowledge.Migrations
 
             modelBuilder.Entity("UniKnowledge.Models.Answer", b =>
                 {
-                    b.HasOne("UniKnowledge.Models.Answer", "Parent")
-                        .WithMany("Replies")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("UniKnowledge.Models.Question", "Question")
                         .WithMany("Answers")
                         .HasForeignKey("QuestionId")
@@ -405,8 +398,6 @@ namespace UniKnowledge.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Parent");
 
                     b.Navigation("Question");
 
@@ -508,8 +499,6 @@ namespace UniKnowledge.Migrations
 
             modelBuilder.Entity("UniKnowledge.Models.Answer", b =>
                 {
-                    b.Navigation("Replies");
-
                     b.Navigation("Votes");
                 });
 

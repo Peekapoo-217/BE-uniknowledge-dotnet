@@ -22,8 +22,8 @@ Tài liệu tóm lược cho AI Coding Assistant nhằm hỗ trợ phát triển
 
 ## 4. Key Features & API Logic
 - **Auth & Security**: Cấp OTP qua Email để reset mật khẩu, JWT Token có thời gian 24h.
-- **Question Logic**: Phân trang theo **Cursor** (CreatedAt + Id) để tối ưu performance cho bộ dữ liệu lớn. Tự động tăng ViewCount khi xem chi tiết.
-- **Answer Logic**: Chủ câu hỏi được chọn "Accepted Answer" duy nhất.
+- **Question Logic**: Phân trang theo **Cursor** (CreatedAt + Id) để tối ưu performance cho bộ dữ liệu lớn. Tự động tăng ViewCount khi xem chi tiết. Hỗ trợ lưu trữ đoạn mã (`CodeContent`, `CodeLanguage`) đi kèm câu hỏi.
+- **Answer Logic**: Chủ câu hỏi được chọn "Accepted Answer" duy nhất. Hỗ trợ đoạn mã (`CodeContent`, `CodeLanguage`) trong câu trả lời.
 - **Tag & Category**: Quản lý quan hệ Many-to-Many giữa Question và Tag. Seeding mặc định đầy đủ Danh mục kỹ thuật.
 - **Real-time Chat**: Hub SignalR xử lý Message, thông báo Typing và trạng thái đã đọc (Read).
 
