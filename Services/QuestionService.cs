@@ -10,7 +10,7 @@ namespace UniKnowledge.Services;
 
 public interface IQuestionService
 {
-    Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null);
+    Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null, bool unansweredOnly = false);
     Task<QuestionResponseDto?> GetQuestionByIdAsync(int id);
     Task<string?> GetQuestionCodeAsync(int id);
     Task<QuestionResponseDto> CreateQuestionAsync(CreateQuestionDto dto, int userId);
@@ -32,7 +32,7 @@ public class QuestionService : IQuestionService
         _searchService = searchService;
     }
 
-    public async Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null)
+    public async Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null, bool unansweredOnly = false)
     {
         // If a search term is provided, use the Smart Search engine (Elasticsearch/SQL Fallback)
         if (!string.IsNullOrWhiteSpace(search))
@@ -103,6 +103,11 @@ public class QuestionService : IQuestionService
         else
         {
             query = query.Where(q => q.Status != QuestionStatus.Hidden);
+        }
+
+        if (unansweredOnly)
+        {
+            query = query.Where(q => !q.Answers.Any());
         }
 
         // Apply cursor filter

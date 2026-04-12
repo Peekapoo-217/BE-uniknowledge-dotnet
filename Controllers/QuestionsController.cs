@@ -29,9 +29,10 @@ public class QuestionsController : ControllerBase
         [FromQuery] int? tagId,
         [FromQuery] string? status,
         [FromQuery] int limit = 20,
-        [FromQuery] string? after = null)
+        [FromQuery] string? after = null,
+        [FromQuery] bool unansweredOnly = false)
     {
-        var questions = await _questionService.GetQuestionsAsync(search, categoryId, tagId, status, limit, after);
+        var questions = await _questionService.GetQuestionsAsync(search, categoryId, tagId, status, limit, after, unansweredOnly);
         return Ok(questions);
     }
 
