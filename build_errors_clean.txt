@@ -1,0 +1,15 @@
+﻿C:\workspace\DA1\ck\BE\UniKnowledge\Services\FileUploadService.cs(66,29): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread. [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\SearchService.cs(115,28): error CS0246: The type or namespace name 'UserSummaryDto' could not be found (are you missing a using directive or an assembly reference?) [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\SearchService.cs(116,53): error CS0246: The type or namespace name 'CategorySummaryDto' could not be found (are you missing a using directive or an assembly reference?) [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\SearchService.cs(117,56): error CS0246: The type or namespace name 'TagSummaryDto' could not be found (are you missing a using directive or an assembly reference?) [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+
+Build FAILED.
+
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\FileUploadService.cs(66,29): warning CS1998: This async method lacks 'await' operators and will run synchronously. Consider using the 'await' operator to await non-blocking API calls, or 'await Task.Run(...)' to do CPU-bound work on a background thread. [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\SearchService.cs(115,28): error CS0246: The type or namespace name 'UserSummaryDto' could not be found (are you missing a using directive or an assembly reference?) [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\SearchService.cs(116,53): error CS0246: The type or namespace name 'CategorySummaryDto' could not be found (are you missing a using directive or an assembly reference?) [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+C:\workspace\DA1\ck\BE\UniKnowledge\Services\SearchService.cs(117,56): error CS0246: The type or namespace name 'TagSummaryDto' could not be found (are you missing a using directive or an assembly reference?) [C:\workspace\DA1\ck\BE\UniKnowledge\UniKnowledge.csproj]
+    1 Warning(s)
+    3 Error(s)
+
+Time Elapsed 00:00:02.24
