@@ -4,6 +4,7 @@ using UniKnowledge.DTOs.Question;
 using UniKnowledge.DTOs.Shared;
 using UniKnowledge.Helpers;
 using UniKnowledge.Models;
+using UniKnowledge.Constants;
 
 namespace UniKnowledge.Services;
 
@@ -22,15 +23,60 @@ public class QuestionService : IQuestionService
 {
     private readonly AppDbContext _context;
     private readonly IFileUploadService _fileUploadService;
+    private readonly ISearchService _searchService;
 
-    public QuestionService(AppDbContext context, IFileUploadService fileUploadService)
+    public QuestionService(AppDbContext context, IFileUploadService fileUploadService, ISearchService searchService)
     {
         _context = context;
         _fileUploadService = fileUploadService;
+        _searchService = searchService;
     }
 
     public async Task<CursorPagedResult<QuestionSummaryDto>> GetQuestionsAsync(string? search = null, int? categoryId = null, int? tagId = null, string? status = null, int limit = 20, string? after = null)
     {
+        // If a search term is provided, use the Smart Search engine (Elasticsearch/SQL Fallback)
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var filter = new UniKnowledge.DTOs.Search.SearchFilterDto(
+                search,
+                categoryId,
+                null, // Combined tag search is handled specifically in QuestionService.loadQuestionsWithMultipleTags on FE
+                status == QuestionStatus.Closed // Basic mapping for IsSolved
+            );
+
+            var searchResults = await _searchService.AdvancedSearchAsync(filter);
+            var ids = searchResults.Select(r => r.Id).ToList();
+
+            if (!ids.Any())
+            {
+                return new CursorPagedResult<QuestionSummaryDto> { Items = new List<QuestionSummaryDto>(), PageInfo = new PageInfo { HasNextPage = false } };
+            }
+
+            // Fetch full models and maintain Relevance Order from search scores
+            var questions = await _context.Questions
+                .Include(q => q.User)
+                .Include(q => q.Category)
+                .Include(q => q.QuestionTags)
+                    .ThenInclude(qt => qt.Tag)
+                .Include(q => q.Answers)
+                .Include(q => q.Votes)
+                .Where(q => ids.Contains(q.QuestionId))
+                .ToListAsync();
+
+            var sortedDtos = ids
+                .Select(id => questions.FirstOrDefault(q => q.QuestionId == id))
+                .Where(q => q != null)
+                .Select(q => MapToSummaryDto(q!))
+                .ToList();
+
+            return new CursorPagedResult<QuestionSummaryDto>
+            {
+                Items = sortedDtos,
+                PageInfo = new PageInfo { HasNextPage = false, EndCursor = null } // Pagination for search results is simplified for now
+            };
+        }
+
+        // Standard LINQ query for main feed (no search term)
         var query = _context.Questions
             .Include(q => q.User)
             .Include(q => q.Category)
@@ -39,12 +85,6 @@ public class QuestionService : IQuestionService
             .Include(q => q.Answers)
             .Include(q => q.Votes)
             .AsQueryable();
-
-        // Apply filters
-        if (!string.IsNullOrEmpty(search))
-        {
-            query = query.Where(q => q.Title.Contains(search) || (q.Content != null && q.Content.Contains(search)));
-        }
 
         if (categoryId.HasValue)
         {
@@ -62,7 +102,7 @@ public class QuestionService : IQuestionService
         }
         else
         {
-            query = query.Where(q => q.Status != "Hidden");
+            query = query.Where(q => q.Status != QuestionStatus.Hidden);
         }
 
         // Apply cursor filter
@@ -79,9 +119,9 @@ public class QuestionService : IQuestionService
                      .ThenByDescending(q => q.QuestionId);
 
         // Fetch limit + 1 to determine hasNextPage
-        var questions = await query.Take(limit + 1).ToListAsync();
-        var hasNextPage = questions.Count > limit;
-        var items = questions.Take(limit).ToList();
+        var pagedQuestions = await query.Take(limit + 1).ToListAsync();
+        var hasNextPage = pagedQuestions.Count > limit;
+        var items = pagedQuestions.Take(limit).ToList();
 
         var dtos = items.Select(q => MapToSummaryDto(q)).ToList();
 
@@ -118,6 +158,37 @@ public class QuestionService : IQuestionService
             .FirstOrDefaultAsync();
     }
 
+    private async Task SyncToElasticsearchAsync(int questionId)
+    {
+        try
+        {
+            var question = await _context.Questions
+                .Include(q => q.QuestionTags)
+                    .ThenInclude(qt => qt.Tag)
+                .Include(q => q.Votes)
+                .FirstOrDefaultAsync(q => q.QuestionId == questionId);
+
+            if (question != null)
+            {
+                var doc = new UniKnowledge.Models.Indexes.QuestionIndexDocument
+                {
+                    Id = question.QuestionId,
+                    Title = question.Title,
+                    Content = question.Content ?? string.Empty,
+                    Tags = question.QuestionTags.Select(qt => qt.Tag.TagName).ToList(),
+                    Upvotes = question.Votes.Count(v => v.VoteType == 1) - question.Votes.Count(v => v.VoteType == -1),
+                    IsSolved = question.Status == QuestionStatus.Closed,
+                    CategoryId = question.CategoryId
+                };
+                await _searchService.IndexQuestionAsync(doc);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error syncing to Elasticsearch: {ex.Message}");
+        }
+    }
+
     public async Task<QuestionResponseDto> CreateQuestionAsync(CreateQuestionDto dto, int userId)
     {
         var lineCount = string.IsNullOrEmpty(dto.CodeContent) ? 0 : dto.CodeContent.Split('\n').Length;
@@ -132,7 +203,7 @@ public class QuestionService : IQuestionService
             CodeContent = dto.CodeContent,
             CodeLanguage = dto.CodeLanguage,
             CodeLineCount = lineCount,
-            Status = "Open",
+            Status = QuestionStatus.Open,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -152,7 +223,9 @@ public class QuestionService : IQuestionService
             await _context.SaveChangesAsync();
         }
 
-        return (await GetQuestionByIdAsync(question.QuestionId))!;
+        var result = (await GetQuestionByIdAsync(question.QuestionId))!;
+        await SyncToElasticsearchAsync(question.QuestionId);
+        return result;
     }
 
     public async Task<QuestionResponseDto?> UpdateQuestionAsync(int id, UpdateQuestionDto dto, int userId)
@@ -211,6 +284,8 @@ public class QuestionService : IQuestionService
         question.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        await SyncToElasticsearchAsync(id);
+
         return await GetQuestionByIdAsync(id);
     }
 
@@ -268,6 +343,9 @@ public class QuestionService : IQuestionService
 
             _context.Questions.Remove(question);
             await _context.SaveChangesAsync();
+
+            await _searchService.DeleteQuestionAsync(id);
+
             return true;
         }
         catch
@@ -290,7 +368,7 @@ public class QuestionService : IQuestionService
         return true;
     }
 
-    private QuestionSummaryDto MapToSummaryDto(Question q)
+    public QuestionSummaryDto MapToSummaryDto(Question q)
     {
         return new QuestionSummaryDto
         {
@@ -318,7 +396,7 @@ public class QuestionService : IQuestionService
         };
     }
 
-    private QuestionResponseDto MapToDto(Question q)
+    public QuestionResponseDto MapToDto(Question q)
     {
         // Optimization: Only return full code if it's "short" (< 20 lines)
         // Otherwise, FE will fetch it via the /code endpoint

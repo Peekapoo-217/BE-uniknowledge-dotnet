@@ -4,8 +4,10 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using UniKnowledge.Data;
 using UniKnowledge.Hubs;
-using UniKnowledge.Services;
 using UniKnowledge.Settings;
+using Elastic.Clients.Elasticsearch;
+using UniKnowledge.Services;
+using UniKnowledge.Services.Search;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,11 +84,14 @@ builder.Services.AddSignalR(options =>
 });
 
 // Add CORS
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+                 ?? new[] { "http://localhost:4200", "http://localhost" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -106,6 +111,18 @@ builder.Services.AddScoped<ITagService, TagService>();
 
 // thêm Services UserProfile
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
+
+// Register Elasticsearch Client
+var esUriString = builder.Configuration["Elasticsearch:Uri"] ?? "http://localhost:9200";
+var esSettings = new ElasticsearchClientSettings(new Uri(esUriString))
+    .DefaultIndex("questions_index");
+var esClient = new ElasticsearchClient(esSettings);
+builder.Services.AddSingleton(esClient);
+
+// Register Search Providers & Hybrid Service
+builder.Services.AddScoped<ElasticsearchSearchProvider>();
+builder.Services.AddScoped<SqlSearchProvider>();
+builder.Services.AddScoped<ISearchService, SearchService>();
 
 // Configure EmailSettings (merge appsettings.json + environment variables)
 builder.Services.Configure<EmailSettings>(options =>
