@@ -1,13 +1,13 @@
+using Elastic.Clients.Elasticsearch;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using UniKnowledge.Data;
 using UniKnowledge.Hubs;
-using UniKnowledge.Settings;
-using Elastic.Clients.Elasticsearch;
 using UniKnowledge.Services;
 using UniKnowledge.Services.Search;
+using UniKnowledge.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,7 +84,7 @@ builder.Services.AddSignalR(options =>
 });
 
 // Add CORS
-var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
                  ?? new[] { "http://localhost:4200", "http://localhost" };
 
 builder.Services.AddCors(options =>
@@ -165,6 +165,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseCors("AllowAll");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -177,7 +178,7 @@ app.UseHttpsRedirection();
 // Enable static files serving (for uploaded files)
 app.UseStaticFiles();
 
-app.UseCors("AllowAll");
+
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -186,5 +187,6 @@ app.MapControllers();
 
 // Map SignalR Hub
 app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<CollaborativeCodeHub>("/hubs/code");
 
 app.Run();

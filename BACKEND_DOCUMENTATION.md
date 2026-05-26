@@ -413,6 +413,41 @@ Sử dụng cho các API danh sách (List View).
 
 ---
 
+## 🔄 SignalR Hub — `/hubs/code` (Collaborative Code Editor)
+
+### Kết nối & Thiết lập
+- **Đường dẫn mapping**: Được đăng ký route `/hubs/code` trong tệp [Program.cs](file:///c:/workspace/DA1/ck/BE/UniKnowledge/Program.cs).
+- **Yêu cầu Xác thực**: Bắt buộc JWT Bearer Token hợp lệ.
+- **Tối ưu hóa Database (Database Decoupling)**: Không truy vấn DB khi người dùng kết nối. Mọi thông tin cần thiết (`UserId`, `Username`, `FullName`, `AvatarUrl`) được mã hóa trong JWT claims và được trích xuất trực tiếp thông qua `Context.User.FindFirst` trên bộ nhớ (In-memory claim extraction).
+- **Tạo phòng (SignalR Group)**: Người dùng tham gia tự động được gộp vào nhóm theo khuôn mẫu `code_room_{roomId}`.
+
+### Quản lý Hiện diện & An toàn luồng (Room Presence Tracking)
+Sử dụng cấu trúc bảng băm lồng luồng an toàn tĩnh:
+`private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, UserPresenceDto>> _presenceMap`
+- **Nguyên tử hóa quy trình xóa (Atomic Cleanup)**: Khi người dùng rời phòng (`LeaveRoom`) hoặc ngắt kết nối (`OnDisconnectedAsync`), kết nối sẽ được loại bỏ khỏi phòng một cách an toàn luồng.
+- **Giải phóng bộ nhớ triệt để**: Nếu số lượng kết nối trong phòng trở về `0`, đối tượng phòng sẽ được dọn dẹp tuyệt đối khỏi bản đồ tĩnh thông qua hàm nguyên tử `TryRemove(KeyValuePair.Create(key, roomPresence))` để loại bỏ mọi hiện tượng race conditions.
+- **Chặn phát tín hiệu rác (Broadcast Optimization)**: Hệ thống tự động phát hiện phòng trống và dừng mọi tiến trình phát tín hiệu không cần thiết, giúp tiết kiệm tối đa CPU và băng thông mạng phía máy chủ.
+
+### Client → Server Methods
+
+| Method | Parameters | Mô tả |
+|--------|-----------|-------|
+| `JoinRoom` | `roomId: string` | Tham gia phòng code cộng tác thời gian thực, lưu thông tin vào danh sách hiện diện và phát trạng thái cập nhật cho toàn bộ phòng. |
+| `LeaveRoom` | `roomId: string` | Rời khỏi phòng code, dọn dẹp các kết nối hiện tại. |
+| `SendCodeDelta` | `roomId: string, deltas: object` | Nhận các thay đổi delta phím bấm cục bộ dạng phím bấm và phân phối tới toàn bộ thành viên khác trong phòng. |
+| `SendCursorPosition` | `roomId: string, cursorData: CursorPositionDto` | Nhận tọa độ dòng/cột của con trỏ chuột cục bộ của người dùng để đồng bộ nhanh vị trí sang các cộng tác viên khác. |
+
+### Server → Client Events
+
+| Event | Data | Mô tả |
+|-------|------|-------|
+| `UserPresenceChanged` | `List<UserPresenceDto>` | Danh sách cập nhật của tất cả người dùng trực tuyến trong phòng code. |
+| `ReceiveCodeDelta` | `object[]` | Mảng dữ liệu thay đổi delta phím bấm đồng bộ lên Monaco Editor của client khác. |
+| `ReceiveCursorMoved` | `CursorPositionDto` | Tọa độ dòng/cột của con trỏ chuột cộng tác viên khác kèm thông tin cá nhân của họ. |
+| `Error` | `string` | Thông báo lỗi. |
+
+---
+
 ## ⚙️ Services Architecture
 
 Tất cả services sử dụng **Dependency Injection** qua interface:
